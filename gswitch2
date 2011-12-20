@@ -1,0 +1,151 @@
+#!/usr/bin/env groovy
+
+import java.text.*
+
+public class GrailsSwitcher {
+	private static String version = 0.1
+	
+	private static String GSWITCH_PATH = "/.gswitch"
+
+	private static String VERSIONS_REPO_URL = "http://dist.springframework.org.s3.amazonaws.com/release/GRAILS/grails-" //plus version.zip
+
+	private String userHome = ""
+
+	private CliBuilder cli
+
+	def GrailsSwitcher(){
+
+		userHome = System.getProperty("user.home")
+		cli = new CliBuilder(usage:"gswitch [options] <version>")
+		cli.h(longOpt:"help", "Display this message")
+		cli.versions("Lists currently installed Grails versions")
+		cli.i( longOpt:"install", args:1, argName:"version", "Installs the specified version, if it exists")
+		//cli.set(args:1, argName:"version", "Sets the active Grails version")
+		cli.init("Initializes gswitch")
+
+	}
+
+	String versionsPath(){
+		userHome+GSWITCH_PATH+"/versions"
+	}
+
+
+
+	def writeHelp(){
+		println "GrailsSwitcher v ${version}"
+		cli.usage()
+		println "Executing 'gswitch <version>' wiill set the current environment's Grails version, if available"
+	}
+
+	def init( ){
+		//create the base directories
+		File versions = new File(userHome +GSWITCH_PATH+"/versions")
+		if(versions.mkdirs()){
+			
+		}
+
+	}
+
+	def isFirstRun(){
+		File gswitchHome = new File(userHome + GSWITCH_PATH)
+		!gswitchHome.exists()
+	}
+
+	def installVersion( targetVersion ){
+		println "Installing ${targetVersion}"
+		println "Downloading..."
+		
+		String versionPath = versionsPath()+"/grails-${targetVersion}"
+		String zipPath = versionPath+".zip"
+		FileOutputStream zipFile
+		BufferedOutputStream out
+		try{
+			zipFile = new FileOutputStream(zipPath)
+    		out = new BufferedOutputStream(zipFile)
+    		out << new URL(VERSIONS_REPO_URL +targetVersion +".zip").openStream()
+    		out.close()
+    	}
+    	catch(java.io.FileNotFoundException fnfe){
+    		println "Version '${targetVersion}' does not appear to be a valid Grails version number."
+    		//clean up
+    		out.close()
+    		new File(zipPath).delete()
+    	}
+
+
+    	//unzip
+    	if(new File(zipPath).exists()){
+    		def ant = new AntBuilder()
+    		ant.unzip( src: zipPath, dest: versionsPath(), overWrite:true)	
+    	}
+    	
+    	//check complete
+    	if(new File(versionPath).exists()){
+    		println "Version '${targetVersion}' installed. Run gswitch again to set the version."
+    		new File(zipPath).delete()
+    	}
+    	else{
+    		println "Version '${targetVersion}' not installed correctly. Ensure you have selected a proper version."
+    	}
+
+	}
+
+	def listInstalledVersions(){
+		println "Installed Grails Versions:"
+		new File(versionsPath()).eachDir {
+			print "\t"
+			print it.absolutePath.split("-")[-1]
+
+			print "\n"
+		}	
+	}
+
+	def setVersion( targetVersion ){
+		println "Setting to version ${targetVersion}"
+		
+	}
+
+
+	def switcher(){
+		
+	}
+
+
+
+
+	def go(args){
+		//def cli = new CliBuilder(usage:"gswitch [version]"),
+		def	targetVersion = "",
+			options = cli.parse(args)		
+
+
+		if( isFirstRun() ){
+			println "Configuring folders..."
+			init()
+		}
+		
+		if(!options || options.h){
+			writeHelp()
+		}
+		else if( options.init){
+			init()
+		}		
+		else if(options.i){
+			installVersion( options.i )
+		}
+		else if(options.versions){
+			listInstalledVersions()
+		}
+		else if(!options.arguments()){
+			writeHelp()	
+		}
+		else{
+			setVersion(options.arguments()[0])
+		}
+
+	}
+}
+
+def gswitch = new GrailsSwitcher()
+gswitch.go( this.args )
+print ""
