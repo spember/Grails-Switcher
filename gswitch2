@@ -5,16 +5,16 @@ import java.text.*
 public class GrailsSwitcher {
 	private static String version = 0.1
 	
+	// hidden folder that get's placed in user home
 	private static String GSWITCH_PATH = "/.gswitch"
-
+	//url pattern for downloading Grails versions. This may change in the future
 	private static String VERSIONS_REPO_URL = "http://dist.springframework.org.s3.amazonaws.com/release/GRAILS/grails-" //plus version.zip
 
 	private String userHome = ""
-
 	private CliBuilder cli
 
 	def GrailsSwitcher(){
-
+		//construct the CLI options
 		userHome = System.getProperty("user.home")
 		cli = new CliBuilder(usage:"gswitch [options] <version>")
 		cli.h(longOpt:"help", "Display this message")
@@ -25,25 +25,41 @@ public class GrailsSwitcher {
 
 	}
 
+	/**
+		Convenience method for building the path to the symlink. This path should be set to your $GRAILS_HOME, and $GRAILS_HOME/bin should be in your path
+	*/
+	String symPath(){
+		userHome+GSWITCH_PATH+"/grails"
+	}
+
+	/**
+		Convenience method for building the path to where the downloaded Grails version will be set
+	**/
 	String versionsPath(){
 		userHome+GSWITCH_PATH+"/versions"
 	}
 
+	String versionFolderPath( gv ){
+		versionsPath() +"/grails-${gv}"
+	}
 
 
+	/**
+		Prints help information
+	**/
 	def writeHelp(){
 		println "GrailsSwitcher v ${version}"
 		cli.usage()
 		println "Executing 'gswitch <version>' wiill set the current environment's Grails version, if available"
 	}
 
+	/**
+		Executed on first run; builds the relevant directories
+	**/
 	def init( ){
 		//create the base directories
 		File versions = new File(userHome +GSWITCH_PATH+"/versions")
-		if(versions.mkdirs()){
-			
-		}
-
+		versions.mkdirs()
 	}
 
 	def isFirstRun(){
@@ -55,11 +71,12 @@ public class GrailsSwitcher {
 		println "Installing ${targetVersion}"
 		println "Downloading..."
 		
-		String versionPath = versionsPath()+"/grails-${targetVersion}"
+		String versionPath = versionFolderPath( targetVersion )
 		String zipPath = versionPath+".zip"
 		FileOutputStream zipFile
 		BufferedOutputStream out
 		try{
+			//attempt to download a new version
 			zipFile = new FileOutputStream(zipPath)
     		out = new BufferedOutputStream(zipFile)
     		out << new URL(VERSIONS_REPO_URL +targetVersion +".zip").openStream()
@@ -81,6 +98,10 @@ public class GrailsSwitcher {
     	
     	//check complete
     	if(new File(versionPath).exists()){
+    		//set executable permissions on the bin folder, just in case
+    		new File(versionPath+"/bin").eachFile{
+    			it.setExecutable(true)
+    		}
     		println "Version '${targetVersion}' installed. Run gswitch again to set the version."
     		new File(zipPath).delete()
     	}
@@ -90,27 +111,64 @@ public class GrailsSwitcher {
 
 	}
 
+	def getInstalledVersions(){
+		List versions = []
+		new File(versionsPath()).eachDir {
+			versions.add(it.absolutePath.split("-")[-1])
+		}
+		versions		
+	}
+
+
 	def listInstalledVersions(){
 		println "Installed Grails Versions:"
+		/*
 		new File(versionsPath()).eachDir {
 			print "\t"
 			print it.absolutePath.split("-")[-1]
 
 			print "\n"
+		}
+		*/
+		getInstalledVersions().each{
+			println "\t${it}"	
 		}	
 	}
 
+	def replaceSymLink( String path ){
+		//first, remove the old link, if exists
+		
+		try{
+			File link = new File( symPath() )
+			if(link.exists()){
+				link.delete()	
+			}
+		}
+		catch(Exception e){
+			println "error!"
+		}
+		
+		// now, create
+		if(new File(path).exists()){
+			['ln', '-s', path, symPath()].execute().waitFor() 
+		}
+		else{
+			println "Error: Could not create a symlink."
+		}
+
+	}
+
+
 	def setVersion( targetVersion ){
-		println "Setting to version ${targetVersion}"
-		
+		if(targetVersion in getInstalledVersions()){
+			println "Setting to version ${targetVersion}"
+			replaceSymLink( versionFolderPath( targetVersion ))
+		}
+		else{
+			println "Version '${targetVersion}' does not appear to be installed"
+		}
+
 	}
-
-
-	def switcher(){
-		
-	}
-
-
 
 
 	def go(args){
@@ -148,4 +206,3 @@ public class GrailsSwitcher {
 
 def gswitch = new GrailsSwitcher()
 gswitch.go( this.args )
-print ""
