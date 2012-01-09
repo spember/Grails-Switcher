@@ -3,12 +3,15 @@
 import java.text.*
 
 public class GrailsSwitcher {
-	private static String version = 0.1
+	private static String version = 0.1.1
 	
 	// hidden folder that get's placed in user home
 	private static String GSWITCH_PATH = "/.gswitch"
-	//url pattern for downloading Grails versions. This may change in the future
-	private static String VERSIONS_REPO_URL = "http://dist.springframework.org.s3.amazonaws.com/release/GRAILS/grails-" //plus version.zip
+	//url pattern for downloading Grails versions. This may change in the future, but mirrors will be saved in this array
+	private static List MIRRORS = [
+		"http://dist.springframework.org.s3.amazonaws.com/release/GRAILS/",
+		"http://grails.org/dist/"
+	]
 
 	private String userHome = ""
 	private CliBuilder cli
@@ -20,7 +23,6 @@ public class GrailsSwitcher {
 		cli.h(longOpt:"help", "Display this message")
 		cli.versions("Lists currently installed Grails versions")
 		cli.i( longOpt:"install", args:1, argName:"version", "Installs the specified version, if it exists")
-		//cli.set(args:1, argName:"version", "Sets the active Grails version")
 		cli.init("Initializes gswitch")
 
 	}
@@ -67,46 +69,73 @@ public class GrailsSwitcher {
 		!gswitchHome.exists()
 	}
 
+	/**
+		Cycles through the MIRRORS, looking for the grails version
+	
+
+	**/
+	def downloadVersion( targetVersion, zipPath ){
+		boolean result = false
+		FileOutputStream zipFile
+		BufferedOutputStream out
+		
+		MIRRORS.each{	
+			try{
+				//attempt to download a new version
+				println "Downloading from ${it}..."
+				zipFile = new FileOutputStream(zipPath)
+	    		out = new BufferedOutputStream(zipFile)
+	    		out << new URL(it+"grails-" +targetVersion +".zip").openStream()
+	    		out.close()
+	    		result = true
+    		}
+    		catch(java.io.FileNotFoundException fnfe){
+	    		println "Version '${targetVersion}' not found"
+    		}
+
+		}
+
+		if(!result){
+			//clean up
+			out.close()
+			new File(zipPath).delete()
+			println "Version '${targetVersion}' does not appear to be a valid Grails version."
+		}
+
+		result
+	}
+
+
+	/**
+		Responsible for downloading / extracting the relevant version
+
+	**/
 	def installVersion( targetVersion ){
 		println "Installing ${targetVersion}"
-		println "Downloading..."
 		
 		String versionPath = versionFolderPath( targetVersion )
 		String zipPath = versionPath+".zip"
-		FileOutputStream zipFile
-		BufferedOutputStream out
-		try{
-			//attempt to download a new version
-			zipFile = new FileOutputStream(zipPath)
-    		out = new BufferedOutputStream(zipFile)
-    		out << new URL(VERSIONS_REPO_URL +targetVersion +".zip").openStream()
-    		out.close()
-    	}
-    	catch(java.io.FileNotFoundException fnfe){
-    		println "Version '${targetVersion}' does not appear to be a valid Grails version number."
-    		//clean up
-    		out.close()
-    		new File(zipPath).delete()
-    	}
+		
+		if(downloadVersion(targetVersion, zipPath)){
 
-
-    	//unzip
-    	if(new File(zipPath).exists()){
-    		def ant = new AntBuilder()
-    		ant.unzip( src: zipPath, dest: versionsPath(), overWrite:true)	
-    	}
-    	
-    	//check complete
-    	if(new File(versionPath).exists()){
-    		//set executable permissions on the bin folder, just in case
-    		new File(versionPath+"/bin").eachFile{
-    			it.setExecutable(true)
-    		}
-    		println "Version '${targetVersion}' installed. Run gswitch again to set the version."
-    		new File(zipPath).delete()
-    	}
-    	else{
-    		println "Version '${targetVersion}' not installed correctly. Ensure you have selected a proper version."
+	    	//unzip
+	    	if(new File(zipPath).exists()){
+	    		def ant = new AntBuilder()
+	    		ant.unzip( src: zipPath, dest: versionsPath(), overWrite:true)	
+	    	}
+	    	
+	    	//check complete
+	    	if(new File(versionPath).exists()){
+	    		//set executable permissions on the bin folder, just in case
+	    		new File(versionPath+"/bin").eachFile{
+	    			it.setExecutable(true)
+	    		}
+	    		println "Version '${targetVersion}' installed. Run gswitch again to set the version."
+	    		new File(zipPath).delete()
+	    	}
+	    	else{
+	    		println "Version '${targetVersion}' not installed correctly. Ensure you have selected a proper version."
+	    	}
     	}
 
 	}
@@ -122,14 +151,6 @@ public class GrailsSwitcher {
 
 	def listInstalledVersions(){
 		println "Installed Grails Versions:"
-		/*
-		new File(versionsPath()).eachDir {
-			print "\t"
-			print it.absolutePath.split("-")[-1]
-
-			print "\n"
-		}
-		*/
 		getInstalledVersions().each{
 			println "\t${it}"	
 		}	
