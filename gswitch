@@ -3,7 +3,7 @@
 import java.text.*
 
 public class GrailsSwitcher {
-	private static String version = 0.1.1
+	private static String version = "0.1.1"
 	
 	// hidden folder that get's placed in user home
 	private static String GSWITCH_PATH = "/.gswitch"
