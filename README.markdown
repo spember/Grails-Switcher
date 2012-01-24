@@ -4,7 +4,7 @@ Grails has frequent, active updates... faster, usually, then teams that are usin
 
 Thus, the purpose of this application is to provide a quick method for switching and managing your Grails versions.
 
-You can use gswitch to install Grails versions and switch between your active installation.
+You can use gswitch to install Grails versions and switch between your active installation. Additionally, if executed in a Grails Application root folder using the -a switch, the script will set your current Grails Version to match.
 
 
 ### Requirements ###
@@ -23,19 +23,23 @@ You can use gswitch to install Grails versions and switch between your active in
 
 To install a new version of Grails:
 
-	./gswitch --install <version>
+	gswitch --install <version>
 
 e.g.:
 
-	./gswitch --install 2.0.0
+	gswitch --install 2.0.0
 
 Once installed, you can set the current version by:
 
-	./gswitch <version>
+	gswitch <version>
 
 And can list the currently installed versions by typing:
 
-	./gswitch --versions
+	gswitch --versions
+
+Furthermore, if in an Grails Application root folder, you can automatically set the active Grails Version by calling:
+
+	gswitch -a
 
 
 

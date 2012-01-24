@@ -1,6 +1,9 @@
 #!/usr/bin/env groovy
 
 import java.text.*
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
 
 public class GrailsSwitcher {
 	private static String version = "0.1.1"
@@ -21,8 +24,9 @@ public class GrailsSwitcher {
 		userHome = System.getProperty("user.home")
 		cli = new CliBuilder(usage:"gswitch [options] <version>")
 		cli.h(longOpt:"help", "Display this message")
-		cli.versions("Lists currently installed Grails versions")
-		cli.i( longOpt:"install", args:1, argName:"version", "Installs the specified version, if it exists")
+		cli.v(longOpt:"versions", "Lists currently installed Grails versions")
+		cli.a(longOpt:"auto", "If in a Grails App root directory, will set the current Grails version to match")
+		cli.i(longOpt:"install", args:1, argName:"version", "Installs the specified version, if it exists")
 		cli.init("Initializes gswitch")
 
 	}
@@ -52,7 +56,7 @@ public class GrailsSwitcher {
 	def writeHelp(){
 		println "GrailsSwitcher v ${version}"
 		cli.usage()
-		println "Executing 'gswitch <version>' wiill set the current environment's Grails version, if available"
+		println "Executing 'gswitch <version>' will set the current environment's Grails version, if available"
 	}
 
 	/**
@@ -70,6 +74,37 @@ public class GrailsSwitcher {
 	}
 
 	/**
+		Checks to see if the user is currently in a Grails Application. It does this by looking for 'application.properties' and a 
+		'grails-app' directory
+	**/
+	def isGrailsApplication(){
+		File appProps = new File("application.properties")
+		File gAppDir = new File("grails-app")
+		boolean isGrailsApp = false
+		if(gAppDir.exists() && gAppDir.isDirectory() && appProps.exists() && appProps.canRead()){
+			isGrailsApp = true
+		}
+		isGrailsApp
+	}
+
+	/**
+		Discovers the application version from the application.properties
+	**/
+	def getGrailsApplicationVersion(){
+		Properties props = new Properties()
+		def version = null
+		try{
+			props.load(new FileInputStream("application.properties"))
+			def config = new ConfigSlurper().parse(props)
+			version = config.app.grails.version
+		}
+		catch(IOException ioe){
+			println "Could not load application.properties file"
+		}
+		version
+	}
+
+	/**
 		Cycles through the MIRRORS, looking for the grails version
 	
 
@@ -79,15 +114,16 @@ public class GrailsSwitcher {
 		FileOutputStream zipFile
 		BufferedOutputStream out
 		
-		MIRRORS.each{	
+		for(mirror in MIRRORS){	
 			try{
 				//attempt to download a new version
-				println "Downloading from ${it}..."
+				println "Downloading from ${mirror}..."
 				zipFile = new FileOutputStream(zipPath)
 	    		out = new BufferedOutputStream(zipFile)
-	    		out << new URL(it+"grails-" +targetVersion +".zip").openStream()
+	    		out << new URL(mirror+"grails-" +targetVersion +".zip").openStream()
 	    		out.close()
 	    		result = true
+	    		break
     		}
     		catch(java.io.FileNotFoundException fnfe){
 	    		println "Version '${targetVersion}' not found"
@@ -121,7 +157,13 @@ public class GrailsSwitcher {
 	    	//unzip
 	    	if(new File(zipPath).exists()){
 	    		def ant = new AntBuilder()
-	    		ant.unzip( src: zipPath, dest: versionsPath(), overWrite:true)	
+	    		try{
+	    			ant.unzip( src: zipPath, dest: versionsPath(), overWrite:true)	
+	    		}
+	    		catch(java.util.zip.ZipException ze){
+	    			println "There was a problem unzipping the file. Clearing out. Please try again, and if problem persists, please report it"
+	    			zipPath.delete()
+	    		}
 	    	}
 	    	
 	    	//check complete
@@ -182,13 +224,69 @@ public class GrailsSwitcher {
 
 	def setVersion( targetVersion ){
 		if(targetVersion in getInstalledVersions()){
-			println "Setting to version ${targetVersion}"
+			print "Setting to version ${targetVersion}..."
 			replaceSymLink( versionFolderPath( targetVersion ))
+			println " done."
 		}
 		else{
 			println "Version '${targetVersion}' does not appear to be installed"
+			promptToInstallVersion targetVersion
 		}
 
+	}
+
+	/**
+		Prompts the user if they wish to install a Grails version. 
+
+		@param String targetVersion The version to install
+	**/
+	def promptToInstallVersion( targetVersion ){
+		def allowed = null
+		def input
+		String yOrN = "[y/n]: "
+		print "Would you like to install version '${targetVersion}'? ${yOrN}"
+		System.in.withReader {
+			while(true){ 
+				input = it.readLine().toLowerCase()
+				if(input=="y"){
+					allowed = true
+					break
+				}
+				else if(input == "n"){
+					allowed = false
+					break
+				}
+				else{
+					print yOrN
+				}
+			}
+			
+		}
+		if(allowed){
+			installVersion targetVersion
+		} 
+	}
+
+
+	/**
+		Attempts to match the current grails version, if in a current Grails Application
+
+	**/
+	def matchVersion(){
+		if(isGrailsApplication()){
+			def version = getGrailsApplicationVersion()
+			if(version){
+				println "Local Grails Application is using version ${version}"
+				setVersion version
+			}
+			else{
+				println "No version found"
+			}
+			
+		}
+		else{
+			println "This command must be executed while in the root folder of a Grails Application"
+		}
 	}
 
 
@@ -208,6 +306,9 @@ public class GrailsSwitcher {
 		}
 		else if( options.init){
 			init()
+		}
+		else if(options.a){
+			matchVersion()
 		}		
 		else if(options.i){
 			installVersion( options.i )
