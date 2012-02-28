@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.Properties;
 
 public class GrailsSwitcher {
-	private static String version = "0.1.1"
+	private static String version = "0.1.2"
 	
 	// hidden folder that get's placed in user home
 	private static String GSWITCH_PATH = "/.gswitch"
@@ -57,6 +57,7 @@ public class GrailsSwitcher {
 		println "GrailsSwitcher v ${version}"
 		cli.usage()
 		println "Executing 'gswitch <version>' will set the current environment's Grails version, if available"
+		println "Usage of the auto switch may be removed in the future; executing gswitch without arguments while in the folder of a Grails Application Will now automatically attempt to match versions."
 	}
 
 	/**
@@ -295,13 +296,15 @@ public class GrailsSwitcher {
 		def	targetVersion = "",
 			options = cli.parse(args)		
 
-
 		if( isFirstRun() ){
 			println "Configuring folders..."
 			init()
 		}
 		
-		if(!options || options.h){
+		if(!options.arguments() && isGrailsApplication() && !options.h){
+			matchVersion()
+		}
+		else if(!options.arguments() || options.h){
 			writeHelp()
 		}
 		else if( options.init){
@@ -315,9 +318,6 @@ public class GrailsSwitcher {
 		}
 		else if(options.versions){
 			listInstalledVersions()
-		}
-		else if(!options.arguments()){
-			writeHelp()	
 		}
 		else{
 			setVersion(options.arguments()[0])
