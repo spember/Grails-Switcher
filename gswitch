@@ -304,9 +304,7 @@ public class GrailsSwitcher {
 		if(!options.arguments() && isGrailsApplication() && !options.h){
 			matchVersion()
 		}
-		else if(!options.arguments() || options.h){
-			writeHelp()
-		}
+		
 		else if( options.init){
 			init()
 		}
@@ -318,6 +316,9 @@ public class GrailsSwitcher {
 		}
 		else if(options.versions){
 			listInstalledVersions()
+		}
+		else if(!options.arguments() || options.h){
+			writeHelp()
 		}
 		else{
 			setVersion(options.arguments()[0])
