@@ -41,8 +41,7 @@ Furthermore, if in an Grails Application root folder, you can automatically set 
 
 	gswitch -a
 
+Or just simply:
 
-
-
-
+	gswitch
 
