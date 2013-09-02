@@ -13,6 +13,7 @@ public class GrailsSwitcher {
 	//url pattern for downloading Grails versions. This may change in the future, but mirrors will be saved in this array
 	private static List MIRRORS = [
 		"http://dist.springframework.org.s3.amazonaws.com/release/GRAILS/",
+		"http://dist.springframework.org.s3.amazonaws.com/milestone/GRAILS/",
 		"http://grails.org/dist/"
 	]
 
